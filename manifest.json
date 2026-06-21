@@ -1,0 +1,32 @@
+{
+  "name": "Flatly",
+  "id": "1646194405555154995",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "menu": [
+    {
+      "name": "Flatten selection",
+      "command": "run"
+    },
+    {
+      "name": "Double-size flatten",
+      "command": "double-size-flatten"
+    },
+    {
+      "name": "Settings",
+      "command": "settings"
+    }
+  ],
+  "capabilities": [],
+  "enableProposedApi": false,
+  "documentAccess": "dynamic-page",
+  "editorType": [
+    "figma"
+  ],
+  "networkAccess": {
+    "allowedDomains": [
+      "none"
+    ]
+  }
+}

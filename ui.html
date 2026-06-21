@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --page: #ffffff;
+        --surface: var(--figma-color-bg, #ffffff);
+        --surface-soft: var(--figma-color-bg-secondary, #eef1f5);
+        --surface-hover: var(--figma-color-bg-hover, #f8f9fb);
+        --border: var(--figma-color-border, #dfe5ee);
+        --text: var(--figma-color-text, #0d1224);
+        --text-muted: var(--figma-color-text-secondary, #556174);
+        --brand: #615ff4;
+        --on-brand: #ffffff;
+        --switch-off: var(--figma-color-bg-tertiary, #d8dee8);
+        --switch-off-hover: var(--figma-color-bg-secondary-hover, #c8d0dc);
+        --switch-knob: #ffffff;
+        --section-gap: 16px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        width: 360px;
+        margin: 0;
+        padding: 24px 24px 32px;
+        overflow-x: hidden;
+        overflow-y: auto;
+        background: var(--page);
+        color: var(--text);
+        font: 14px/1.35 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+
+      main {
+        display: grid;
+        gap: var(--section-gap);
+      }
+
+      input,
+      label {
+        font: inherit;
+      }
+
+      .title {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 760;
+        letter-spacing: 0;
+      }
+
+      .subtitle {
+        margin: 6px 0 0;
+        color: var(--text-muted);
+        font-size: 14px;
+        line-height: 1.35;
+      }
+
+      .settings-section {
+        display: grid;
+        gap: 8px;
+      }
+
+      .section-label {
+        color: var(--text-muted);
+        font-size: 14px;
+        line-height: 1.35;
+      }
+
+      .group {
+        display: grid;
+        gap: 10px;
+      }
+
+      .group-title {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        line-height: 1.35;
+        text-transform: uppercase;
+      }
+
+      .card {
+        display: flex;
+        min-height: 76px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px 16px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: var(--surface);
+        cursor: pointer;
+        transition: background 140ms ease;
+      }
+
+      .card:hover {
+        background: var(--surface-hover);
+      }
+
+      .copy {
+        min-width: 0;
+      }
+
+      .label {
+        display: block;
+        color: var(--text);
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+
+      .hint {
+        display: block;
+        margin-top: 4px;
+        color: var(--text-muted);
+        font-size: 14px;
+      }
+
+      .switch {
+        position: relative;
+        width: 44px;
+        height: 24px;
+        flex: 0 0 auto;
+      }
+
+      .switch input {
+        position: absolute;
+        inset: 0;
+        margin: 0;
+        opacity: 0;
+      }
+
+      .switch-track {
+        position: absolute;
+        inset: 0;
+        border-radius: 999px;
+        background: var(--switch-off);
+        cursor: pointer;
+        transition: background 140ms ease, box-shadow 140ms ease;
+      }
+
+      .switch-track::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        background: var(--switch-knob);
+        box-shadow: 0 1px 3px rgb(0 0 0 / 28%), 0 0 0 1px rgb(0 0 0 / 6%);
+        transition: transform 140ms ease;
+      }
+
+      .card:hover .switch input:not(:checked) + .switch-track {
+        background: var(--switch-off-hover);
+        box-shadow: 0 0 0 3px rgb(97 95 244 / 8%);
+      }
+
+      .switch input:focus-visible + .switch-track {
+        outline: 2px solid var(--brand);
+        outline-offset: 2px;
+      }
+
+      .switch input:checked + .switch-track {
+        background: var(--brand);
+      }
+
+      .switch input:checked + .switch-track::after {
+        transform: translateX(20px);
+      }
+
+      .collapse {
+        max-height: 0;
+        opacity: 0;
+        overflow: hidden;
+        transition: max-height 160ms ease, opacity 120ms ease;
+      }
+
+      .collapse.is-open {
+        max-height: 260px;
+        opacity: 1;
+      }
+
+      .stack {
+        display: grid;
+        gap: 4px;
+        padding-top: var(--section-gap);
+      }
+
+      .segmented {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        height: 54px;
+        padding: 4px;
+        border-radius: 18px;
+        background: var(--surface-soft);
+      }
+
+      .segmented.is-scale {
+        grid-template-columns: repeat(4, 1fr);
+        height: 48px;
+      }
+
+      .segment {
+        position: relative;
+        display: grid;
+        place-items: center;
+        border-radius: 15px;
+        color: var(--text);
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 1.35;
+        letter-spacing: 0;
+        transition: background 140ms ease, color 140ms ease;
+      }
+
+      .segmented.is-scale .segment {
+        font-size: 14px;
+      }
+
+      .segment:hover {
+        background: var(--surface-hover);
+      }
+
+      .segment span {
+        display: grid;
+        width: 100%;
+        height: 100%;
+        place-items: center;
+        border-radius: inherit;
+      }
+
+      .segment input:focus-visible + span {
+        outline: 2px solid var(--brand);
+        outline-offset: 2px;
+      }
+
+      .segment.is-active {
+        background: var(--brand);
+        color: var(--on-brand);
+      }
+
+      .segment input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .field {
+        display: grid;
+        max-height: 0;
+        opacity: 0;
+        overflow: hidden;
+        transition: max-height 160ms ease, opacity 120ms ease;
+      }
+
+      .field.is-open {
+        max-height: 200px;
+        opacity: 1;
+      }
+
+      #inside-controls > .stack {
+        gap: 4px;
+        padding-top: 0;
+      }
+
+      .input-wrap {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 4px;
+        height: 70px;
+        min-height: 70px;
+        padding: 10px 16px 12px;
+        border-radius: 16px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        cursor: pointer;
+        transition: border-color 140ms ease, background 140ms ease;
+      }
+
+      .input-wrap::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 2px solid transparent;
+        border-radius: inherit;
+        pointer-events: none;
+        transition: border-color 140ms ease;
+      }
+
+      .input-wrap.is-empty:not(:focus-within) {
+        gap: 0;
+      }
+
+      .input-wrap:hover {
+        background: var(--surface-hover);
+      }
+
+      .input-wrap:focus-within {
+        border-color: transparent;
+      }
+
+      .input-wrap:focus-within::after {
+        border-color: var(--brand);
+      }
+
+      .field-label {
+        display: block;
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 14px;
+        font-weight: 400;
+        line-height: 1.35;
+      }
+
+      .text-input {
+        width: 100%;
+        min-width: 0;
+        height: 24px;
+        border: 0;
+        outline: none;
+        background: transparent;
+        color: var(--text);
+        font-size: 16px;
+        font-weight: 700;
+        padding: 0;
+        line-height: 1.35;
+        cursor: text;
+        transition: height 140ms ease, opacity 120ms ease;
+        -webkit-user-select: text;
+        user-select: text;
+      }
+
+      .input-wrap.is-empty:not(:focus-within) .text-input {
+        height: 0;
+        opacity: 0;
+      }
+
+      .text-input::placeholder {
+        color: transparent;
+      }
+
+      .text-input:disabled {
+        color: var(--text-muted);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          transition-duration: 1ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main aria-label="Flatly settings">
+        <header>
+          <h1 class="title">Flatly Settings</h1>
+          <p class="subtitle">Choose how selected layers flatten</p>
+        </header>
+
+        <section class="group" aria-labelledby="flatten-title">
+          <h2 class="group-title" id="flatten-title">Flatten at</h2>
+          <div class="segmented is-scale" role="radiogroup" aria-labelledby="flatten-title" data-radio-group="flatten-scale">
+            <label class="segment" data-segment="1">
+              <input type="radio" name="flatten-scale" value="1" />
+              <span>1x</span>
+            </label>
+
+            <label class="segment" data-segment="2">
+              <input type="radio" name="flatten-scale" value="2" />
+              <span>2x</span>
+            </label>
+
+            <label class="segment" data-segment="3">
+              <input type="radio" name="flatten-scale" value="3" />
+              <span>3x</span>
+            </label>
+
+            <label class="segment" data-segment="4">
+              <input type="radio" name="flatten-scale" value="4" />
+              <span>4x</span>
+            </label>
+          </div>
+        </section>
+
+        <section class="group">
+          <h2 class="group-title">Export</h2>
+          <label class="card">
+            <span class="copy">
+              <span class="label">Add export settings</span>
+              <span class="hint">Create a PNG export preset after flattening</span>
+            </span>
+            <span class="switch" aria-label="Add export settings">
+              <input id="add-export-settings" type="checkbox" />
+              <span class="switch-track"></span>
+            </span>
+          </label>
+
+          <div class="collapse" id="export-controls">
+            <div class="settings-section" aria-labelledby="export-scale-label">
+              <span class="section-label" id="export-scale-label">Export at</span>
+              <div class="segmented is-scale" role="radiogroup" aria-labelledby="export-scale-label" data-radio-group="export-scale">
+                <label class="segment" data-segment="1">
+                  <input type="radio" name="export-scale" value="1" />
+                  <span>1x</span>
+                </label>
+
+                <label class="segment" data-segment="2">
+                  <input type="radio" name="export-scale" value="2" />
+                  <span>2x</span>
+                </label>
+
+                <label class="segment" data-segment="3">
+                  <input type="radio" name="export-scale" value="3" />
+                  <span>3x</span>
+                </label>
+
+                <label class="segment" data-segment="4">
+                  <input type="radio" name="export-scale" value="4" />
+                  <span>4x</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="group">
+          <h2 class="group-title">Original layers</h2>
+          <label class="card">
+            <span class="copy">
+              <span class="label">Keep original layers</span>
+              <span class="hint">Keep editable sources after flattening</span>
+            </span>
+            <span class="switch" aria-label="Keep original layers">
+              <input id="preserve-originals" type="checkbox" />
+              <span class="switch-track"></span>
+            </span>
+          </label>
+
+          <div class="collapse" id="preserve-controls">
+          <div class="stack">
+            <div class="segmented" role="radiogroup" aria-label="Original layer location" data-radio-group="placement">
+              <label class="segment" data-segment="inside">
+                <input type="radio" name="placement" value="inside" />
+                <span>Inside</span>
+              </label>
+
+              <label class="segment" data-segment="beside">
+                <input type="radio" name="placement" value="beside" />
+                <span>Beside</span>
+              </label>
+            </div>
+
+            <div class="collapse" id="inside-controls">
+              <div class="stack">
+                <label class="card">
+                  <span class="copy">
+                    <span class="label">Group source layers</span>
+                    <span class="hint">Put sources in one hidden group</span>
+                  </span>
+                  <span class="switch" aria-label="Group source layers">
+                    <input id="group-inside" type="checkbox" />
+                    <span class="switch-track"></span>
+                  </span>
+                </label>
+
+                <label class="field" id="group-name-field">
+                  <span class="input-wrap">
+                    <span class="field-label">Group name</span>
+                    <input class="text-input" id="group-name" type="text" autocomplete="off" spellcheck="false" placeholder=" " />
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+          </div>
+        </section>
+    </main>
+
+    <script>
+      const DEFAULT_GROUP_NAME = 'Flatly source layers'
+      const GROUP_NAME_SAVE_DELAY = 300
+      const DEFAULT_FLATTEN_SCALE = 4
+      const DEFAULT_EXPORT_SCALE = 4
+
+      const addExportSettingsInput = document.getElementById('add-export-settings')
+      const exportControls = document.getElementById('export-controls')
+      const preserveOriginalsInput = document.getElementById('preserve-originals')
+      const preserveControls = document.getElementById('preserve-controls')
+      const insideControls = document.getElementById('inside-controls')
+      const groupInsideInput = document.getElementById('group-inside')
+      const groupNameField = document.getElementById('group-name-field')
+      const groupNameInput = document.getElementById('group-name')
+      const groupNameWrap = document.querySelector('#group-name-field .input-wrap')
+
+      let saveTimer = null
+      let isHydrating = true
+
+      function normalizeScale(value, fallback) {
+        const scale = Number(value)
+        return scale === 1 || scale === 2 || scale === 3 || scale === 4 ? scale : fallback
+      }
+
+      function getRadioValue(name, fallback) {
+        const selected = document.querySelector(`input[name="${name}"]:checked`)
+        return selected ? selected.value : fallback
+      }
+
+      function setRadioValue(name, value, fallback) {
+        const selected = document.querySelector(`input[name="${name}"][value="${value}"]`)
+        const fallbackSelected = document.querySelector(`input[name="${name}"][value="${fallback}"]`)
+
+        if (selected) {
+          selected.checked = true
+          return
+        }
+
+        if (fallbackSelected) {
+          fallbackSelected.checked = true
+        }
+      }
+
+      function getPlacement() {
+        return getRadioValue('placement', 'inside')
+      }
+
+      function setPlacement(value) {
+        const placement = value === 'beside' ? 'beside' : 'inside'
+        setRadioValue('placement', placement, 'inside')
+      }
+
+      function getScale(name, fallback) {
+        return normalizeScale(getRadioValue(name, String(fallback)), fallback)
+      }
+
+      function setScale(name, value, fallback) {
+        const scale = normalizeScale(value, fallback)
+        setRadioValue(name, String(scale), String(fallback))
+      }
+
+      function normalizeSettings(settings) {
+        const safeSettings = settings && typeof settings === 'object' ? settings : {}
+        const groupName =
+          typeof safeSettings.groupName === 'string' && safeSettings.groupName.trim().length > 0
+            ? safeSettings.groupName.trim()
+            : DEFAULT_GROUP_NAME
+
+        return {
+          flattenScale: normalizeScale(safeSettings.flattenScale, DEFAULT_FLATTEN_SCALE),
+          addExportSettings:
+            typeof safeSettings.addExportSettings === 'boolean' ? safeSettings.addExportSettings : false,
+          exportScale: normalizeScale(safeSettings.exportScale, DEFAULT_EXPORT_SCALE),
+          preserveOriginals:
+            typeof safeSettings.preserveOriginals === 'boolean' ? safeSettings.preserveOriginals : true,
+          placement: safeSettings.placement === 'beside' ? 'beside' : 'inside',
+          groupInside: typeof safeSettings.groupInside === 'boolean' ? safeSettings.groupInside : true,
+          groupName,
+        }
+      }
+
+      function collectSettings() {
+        return {
+          flattenScale: getScale('flatten-scale', DEFAULT_FLATTEN_SCALE),
+          addExportSettings: addExportSettingsInput.checked,
+          exportScale: getScale('export-scale', DEFAULT_EXPORT_SCALE),
+          preserveOriginals: preserveOriginalsInput.checked,
+          placement: getPlacement(),
+          groupInside: groupInsideInput.checked,
+          groupName: groupNameInput.value.trim() || DEFAULT_GROUP_NAME,
+        }
+      }
+
+      function syncSegments() {
+        for (const group of document.querySelectorAll('[data-radio-group]')) {
+          const selected = group.querySelector('input[type="radio"]:checked')
+          const selectedValue = selected ? selected.value : ''
+
+          for (const segment of group.querySelectorAll('[data-segment]')) {
+            segment.classList.toggle('is-active', segment.dataset.segment === selectedValue)
+          }
+        }
+      }
+
+      function syncGroupNameField() {
+        if (!groupNameWrap) {
+          return
+        }
+
+        groupNameWrap.classList.toggle('is-empty', groupNameInput.value.trim().length === 0)
+      }
+
+      function syncVisibility() {
+        const addExportSettings = addExportSettingsInput.checked
+        const preserveOriginals = preserveOriginalsInput.checked
+        const isInside = getPlacement() === 'inside'
+        const canNameGroup = preserveOriginals && isInside && groupInsideInput.checked
+
+        exportControls.classList.toggle('is-open', addExportSettings)
+        preserveControls.classList.toggle('is-open', preserveOriginals)
+        insideControls.classList.toggle('is-open', preserveOriginals && isInside)
+        groupNameField.classList.toggle('is-open', canNameGroup)
+        syncSegments()
+        syncGroupNameField()
+      }
+
+      function postPluginMessage(message) {
+        parent.postMessage({ pluginMessage: message }, '*')
+      }
+
+      function saveNow() {
+        window.clearTimeout(saveTimer)
+
+        if (isHydrating) {
+          return
+        }
+
+        postPluginMessage({
+          type: 'settings-changed',
+          settings: collectSettings(),
+        })
+      }
+
+      function saveLater() {
+        window.clearTimeout(saveTimer)
+
+        if (isHydrating) {
+          return
+        }
+
+        saveTimer = window.setTimeout(saveNow, GROUP_NAME_SAVE_DELAY)
+      }
+
+      function renderSettings(settings) {
+        const normalizedSettings = normalizeSettings(settings)
+
+        isHydrating = true
+        setScale('flatten-scale', normalizedSettings.flattenScale, DEFAULT_FLATTEN_SCALE)
+        addExportSettingsInput.checked = normalizedSettings.addExportSettings
+        setScale('export-scale', normalizedSettings.exportScale, DEFAULT_EXPORT_SCALE)
+        preserveOriginalsInput.checked = normalizedSettings.preserveOriginals
+        setPlacement(normalizedSettings.placement)
+        groupInsideInput.checked = normalizedSettings.groupInside
+        groupNameInput.value = normalizedSettings.groupName
+        syncVisibility()
+        isHydrating = false
+      }
+
+      function handleImmediateChange() {
+        syncVisibility()
+        saveNow()
+      }
+
+      addExportSettingsInput.addEventListener('change', handleImmediateChange)
+      preserveOriginalsInput.addEventListener('change', handleImmediateChange)
+      groupInsideInput.addEventListener('change', handleImmediateChange)
+      groupNameInput.addEventListener('input', () => {
+        syncVisibility()
+        saveLater()
+      })
+      groupNameInput.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') {
+          return
+        }
+
+        event.preventDefault()
+        saveNow()
+        groupNameInput.blur()
+      })
+
+      for (const input of document.querySelectorAll('input[type="radio"]')) {
+        input.addEventListener('change', handleImmediateChange)
+      }
+
+      window.onmessage = (event) => {
+        const message = event.data.pluginMessage
+
+        if (!message || message.type !== 'settings-loaded') {
+          return
+        }
+
+        renderSettings(message.settings)
+      }
+
+      renderSettings()
+      postPluginMessage({ type: 'settings-ready' })
+    </script>
+  </body>
+</html>
