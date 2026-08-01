@@ -1,10 +1,8 @@
 # Flatly
 
-Flatly is a Figma plugin that rasterizes selected frames, main components, and instances.
+Flatly turns selected Figma frames, main components, and instances into PNG-backed layers. It calculates the export resolution for each layer, then applies the result according to your source-layer setting.
 
-When Flatly runs, it exports every selected node as a PNG up to Figma's 4096px image limit and a 32x upscale limit. Frames and main components are flattened into a single image fill. Instances either keep the current linked instance and create a detached flattened frame nearby, or flatten the selected instance in place, depending on your source-layer settings.
-
-## Setup
+## Install for development
 
 1. Install dependencies:
 
@@ -19,53 +17,45 @@ When Flatly runs, it exports every selected node as a PNG up to Figma's 4096px i
    ```
 
 3. In Figma, open `Plugins > Development > Import plugin from manifest...`.
-4. Select `manifest.json` from this folder.
+4. Select this project's `manifest.json`.
 
-## Usage
+## Flatten a selection
 
-1. Select one or more independent frames, main components, or instances in Figma.
+1. Select one or more independent frames, main components, or instances.
 2. Run `Plugins > Development > Flatly > Flatten`.
-3. Each flattened result becomes one rasterized image fill.
+3. Flatly exports each selected layer as a PNG and applies it as one image fill.
 
-Use `Plugins > Development > Flatly > Settings` to configure what happens to the original editable layers before flattening. Choose one of the three native options:
+For frames and main components, Flatly replaces the selected layer's contents with the image. For instances, the default mode keeps the linked instance and creates a detached flattened frame beside it.
 
-- `Keep original layers inside the result`
-- `Keep original layers beside the result`
-- `Remove original layers`
+## Source layer settings
 
-Settings are saved when you finish the native Figma parameter flow. Removing original layers no longer asks for a placement.
+Open `Plugins > Development > Flatly > Settings`, then choose an option under `Original layers`. Settings can be opened without a selection and are saved locally between runs.
 
-## Validation
+| Option | Frames and main components | Instances |
+| --- | --- | --- |
+| `Keep original layers inside the result` (default) | Keep child layers in a hidden `Flatly source layers` group inside the flattened layer. | Keep the linked instance and create a detached flattened frame beside it. |
+| `Keep original layers beside the result` | Copy the original layer beside the result, then flatten the selected layer in place. | Copy the linked instance beside the result, then detach and flatten the selected instance in place. |
+| `Remove original layers` | Remove child layers and flatten the selected layer in place. | Detach the instance, remove its child layers, and flatten it in place. |
 
-The plugin makes no changes and shows a message when:
+Copies kept beside the result use the original name followed by ` — original` and are placed 24px away.
 
-- nothing is selected;
-- any selected layer is not a frame, main component, or instance;
-- both a parent node and one of its nested nodes are selected.
+## Automatic resolution
 
-Regular frames, main components, and instances are supported in this version. Component sets, groups, and sections are intentionally ignored.
+Flatly calculates the largest export scale that keeps the longest transformed dimension at or below 4096px. Smaller layers can be upscaled automatically, up to 32x. The other dimension keeps its aspect ratio.
 
-## Flatten Resolution
+There is no resolution picker or saved scale setting. Flatly also bakes the source transform into the image, so rotated and mirrored layers keep their visual appearance in the flattened result.
 
-Flatly sizes each rasterized image up to the maximum resolution Figma supports. The largest image dimension is 4096px, and the other dimension keeps the layer's aspect ratio. Small layers are automatically upscaled by no more than 32x. Flatly does not show or store a scale choice.
+## Supported selections
 
-Flattened results bake the selected layer's transform into the image fill, so rotated or mirrored layers keep the same visual appearance while the flattened frame uses an unrotated transform.
+Flatly supports regular frames, main components, and instances. It does not flatten groups, component sets, sections, or other layer types.
 
-## Source Layer Settings
+Select independent layers only. Flatly rejects a selection that contains both a parent and one of its nested supported layers, and it leaves the document unchanged when the selection is invalid.
 
-By default, Flatly keeps editable source layers inside each flattened result. The default setup matches the previous behavior: source layers are moved into a hidden `Flatly source layers` group.
-
-The native `Settings` command lets you choose whether to keep original editable layers and, when they are kept, where they stay.
-
-When originals stay inside the flattened result, Flatly always wraps them in a hidden group named `Flatly source layers`. The group name and grouping behavior are fixed.
-
-For frames and main components, `Beside` copies the original layer nearby, then replaces the selected layer with the flattened image. For instances, the default inside mode keeps the linked instance unchanged and creates a detached flattened frame nearby. If originals are disabled, or if `Beside` is selected, the selected instance is detached and flattened in place.
-
-Settings are stored locally with Figma `clientStorage` under `flatly.settings.v1`, so they remain available between plugin runs. Flatly still makes no network requests and `networkAccess.allowedDomains` remains `none`.
+If one layer cannot be exported or flattened, Flatly reports the failure and keeps that layer unchanged. Other valid layers in the same selection can still finish.
 
 ## Development
 
-Build TypeScript into the `code.js` file referenced by `manifest.json`:
+Build the TypeScript entry point referenced by `manifest.json`:
 
 ```sh
 npm run build
@@ -77,8 +67,16 @@ Run lint checks:
 npm run lint
 ```
 
-Run the full release check before importing or publishing the plugin:
+Run tests:
+
+```sh
+npm test
+```
+
+Run the complete release check:
 
 ```sh
 npm run verify
 ```
+
+Flatly runs only in Figma Design and requests no network access.
