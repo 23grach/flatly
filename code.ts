@@ -264,6 +264,10 @@ function isInPlaceFlattenableNode(node: FlattenableNode): node is InPlaceFlatten
   return node.type === 'FRAME' || node.type === 'COMPONENT'
 }
 
+function isSourceLayersGroup(node: SceneNode): node is GroupNode {
+  return node.type === 'GROUP' && node.name === DEFAULT_GROUP_NAME
+}
+
 function hasSelectedAncestor(node: FlattenableNode, selectedNodeIds: Set<string>): boolean {
   let parent = node.parent
 
@@ -507,10 +511,9 @@ function preserveSourceLayersInGroup(container: SourceContainerNode): void {
   if (
     children.length === 1 &&
     existingWrapper !== undefined &&
-    existingWrapper.type === 'GROUP' &&
-    existingWrapper.name === DEFAULT_GROUP_NAME &&
-    !existingWrapper.visible
+    isSourceLayersGroup(existingWrapper)
   ) {
+    existingWrapper.visible = false
     return
   }
 

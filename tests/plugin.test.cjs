@@ -376,6 +376,30 @@ test('runs a frame flatten and preserves sources without changing selection', as
   assert.equal(runtime.figma.currentPage.children.length, 1)
 })
 
+test('reuses an existing source-layer group instead of nesting it', async () => {
+  const runtime = createMockRuntime()
+  const sourceGroup = runtime.makeContainer('GROUP', {
+    name: 'Flatly source layers',
+    visible: true,
+    children: [runtime.makeLeaf({ name: 'Source rectangle' })],
+  })
+  const frame = runtime.makeContainer('FRAME', {
+    id: 'frame-existing-group',
+    name: 'Card with sources',
+    children: [sourceGroup],
+  })
+
+  runtime.figma.currentPage.appendChild(frame)
+  runtime.figma.currentPage.selection = [frame]
+  runtime.state.runHandler({ command: 'flatten', parameters: undefined })
+  await waitForClose(runtime.state)
+
+  assert.equal(frame.children.length, 1)
+  assert.equal(frame.children[0], sourceGroup)
+  assert.equal(sourceGroup.visible, false)
+  assert.equal(sourceGroup.children.length, 1)
+})
+
 test('keeps an instance linked and creates a detached flattened result without changing selection', async () => {
   const runtime = createMockRuntime()
   const child = runtime.makeLeaf({ name: 'Instance child' })
