@@ -47,7 +47,7 @@ Regular frames, main components, and instances are supported in this version. Co
 
 ## Flatten Resolution
 
-Flatly sizes each rasterized image to the maximum resolution Figma supports. The largest image dimension is 4096px, and the other dimension keeps the layer's aspect ratio. Flatly does not show or store a scale choice.
+Flatly sizes each rasterized image up to the maximum resolution Figma supports. The largest image dimension is 4096px, and the other dimension keeps the layer's aspect ratio. Small layers are automatically upscaled by no more than 16x. Flatly does not show or store a scale choice.
 
 Flattened results bake the selected layer's transform into the image fill, so rotated or mirrored layers keep the same visual appearance while the flattened frame uses an unrotated transform.
 

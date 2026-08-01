@@ -2,6 +2,7 @@ const RESULT_GAP = 24
 const SETTINGS_STORAGE_KEY = 'flatly.settings.v1'
 const DEFAULT_GROUP_NAME = 'Flatly source layers'
 const FIGMA_IMAGE_MAX_DIMENSION = 4096
+const MAX_AUTO_UPSCALE = 16
 const FLATTEN_COMMAND = 'flatten'
 const SETTINGS_COMMAND = 'settings'
 const SETTINGS_PARAMETER_KEY = 'settings'
@@ -332,7 +333,7 @@ function getMaximumFlattenScale(bounds: Bounds): number {
     return 1
   }
 
-  return FIGMA_IMAGE_MAX_DIMENSION / maxDimension
+  return Math.min(FIGMA_IMAGE_MAX_DIMENSION / maxDimension, MAX_AUTO_UPSCALE)
 }
 
 function getFlattenedMessage(nodeCount: number): string {
