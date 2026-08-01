@@ -3,19 +3,22 @@
   "id": "1646194405555154995",
   "api": "1.0.0",
   "main": "code.js",
-  "ui": "ui.html",
   "menu": [
     {
-      "name": "Flatten selection",
-      "command": "run"
-    },
-    {
-      "name": "Double-size flatten",
-      "command": "double-size-flatten"
+      "name": "Flatten",
+      "command": "flatten"
     },
     {
       "name": "Settings",
-      "command": "settings"
+      "command": "settings",
+      "parameters": [
+        {
+          "name": "Settings",
+          "key": "settings",
+          "description": "Choose how original layers are handled."
+        }
+      ],
+      "parameterOnly": true
     }
   ],
   "capabilities": [],
