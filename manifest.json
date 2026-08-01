@@ -13,9 +13,9 @@
       "command": "settings",
       "parameters": [
         {
-          "name": "Settings",
+          "name": "Original layers",
           "key": "settings",
-          "description": "Choose how original layers are handled."
+          "description": "Choose what to do with the original layers after flattening."
         }
       ],
       "parameterOnly": true

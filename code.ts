@@ -58,18 +58,18 @@ type SettledResult<T> =
     }
 
 const FAILURE_OPERATION_MESSAGES: Record<FlattenFailureOperation, string> = {
-  export: 'Could not export this layer as a PNG',
-  'read-bounds': 'Could not read this layer\'s bounds',
-  'create-original-copy': 'Could not create the original copy',
-  'create-detached-frame': 'Could not create the detached frame',
-  'place-result': 'Could not place the flattened result',
-  'detach-instance': 'Could not detach the instance',
-  'configure-result': 'Could not configure the flattened result',
-  'preserve-source-layers': 'Could not preserve the source layers',
-  'remove-source-layers': 'Could not remove the source layers',
-  'resize-result': 'Could not resize the flattened result',
-  'set-image': 'Could not set the flattened image',
-  flatten: 'Could not flatten this layer',
+  export: 'Couldn\'t export it as a PNG. Check that it can be exported, then try again',
+  'read-bounds': 'Couldn\'t read its size. Try again',
+  'create-original-copy': 'Couldn\'t copy it to keep the original. Try again',
+  'create-detached-frame': 'Couldn\'t create a flattened frame from it. Try again',
+  'place-result': 'Couldn\'t place the flattened result. Try again',
+  'detach-instance': 'Couldn\'t detach it. Try again',
+  'configure-result': 'Couldn\'t set up the flattened result. Try again',
+  'preserve-source-layers': 'Couldn\'t keep the original layers. Try again',
+  'remove-source-layers': 'Couldn\'t remove the original layers. Try again',
+  'resize-result': 'Couldn\'t resize the flattened result. Try again',
+  'set-image': 'Couldn\'t apply the flattened image. Try again',
+  flatten: 'Couldn\'t flatten it. Try again',
 }
 
 const DEFAULT_SETTINGS: FlatlySettings = {
@@ -87,7 +87,7 @@ class FlattenFailure extends Error {
   readonly cause: unknown
 
   constructor(node: FlattenableNode, phase: FlattenFailurePhase, operation: FlattenFailureOperation, cause: unknown) {
-    super(`${FAILURE_OPERATION_MESSAGES[operation]} for "${node.name}".`)
+    super(`"${node.name}": ${FAILURE_OPERATION_MESSAGES[operation]}.`)
     this.name = 'FlattenFailure'
     this.sourceNode = node
     this.nodeId = node.id
@@ -172,13 +172,13 @@ const NATIVE_SETTINGS_OPTIONS: ReadonlyArray<{
   placement: SourcePlacement
 }> = [
   {
-    name: 'Keep original layers / Inside',
+    name: 'Keep original layers inside the result',
     data: 'keep-inside',
     preserveOriginals: true,
     placement: 'inside',
   },
   {
-    name: 'Keep original layers / Beside',
+    name: 'Keep original layers beside the result',
     data: 'keep-beside',
     preserveOriginals: true,
     placement: 'beside',
@@ -279,18 +279,18 @@ function validateSelection(selection: readonly SceneNode[]): FlattenableNode[] |
 
 function getSelectionError(selection: readonly SceneNode[]): string | null {
   if (selection.length === 0) {
-    return 'Select one or more frames, components, or instances to flatten.'
+    return 'Select at least one frame, main component, or instance to flatten.'
   }
 
   if (!selection.every(isFlattenableNode)) {
-    return 'Flatten only supports selected frames, main components, and instances. Remove unsupported layers from the selection.'
+    return 'Flatly can flatten only frames, main components, and instances. Remove other layer types from your selection.'
   }
 
   const nodes = selection.filter(isFlattenableNode)
   const selectedNodeIds = new Set(nodes.map((node) => node.id))
 
   if (nodes.some((node) => hasSelectedAncestor(node, selectedNodeIds))) {
-    return 'Select independent frames, components, or instances only. Do not select both a parent and a nested node.'
+    return "Select separate frames, main components, or instances. Don't select a parent and a nested layer together."
   }
 
   return null
@@ -336,9 +336,12 @@ function getMaximumFlattenScale(bounds: Bounds): number {
   return Math.min(FIGMA_IMAGE_MAX_DIMENSION / maxDimension, MAX_AUTO_UPSCALE)
 }
 
-function getFlattenedMessage(nodeCount: number): string {
-  const nodeLabel = nodeCount === 1 ? 'node' : 'nodes'
-  return `Flattened ${nodeCount} ${nodeLabel}.`
+function getLayerLabel(layerCount: number): 'layer' | 'layers' {
+  return layerCount === 1 ? 'layer' : 'layers'
+}
+
+function getFlattenedMessage(layerCount: number): string {
+  return `Flattened ${layerCount} ${getLayerLabel(layerCount)}.`
 }
 
 function createIdentityTransform(bounds: Bounds): Transform {
@@ -376,7 +379,7 @@ function createExportWrapper(node: FlattenableNode, bounds: Bounds, transform: T
   let exportClone: FlattenableNode | null = null
 
   try {
-    wrapper.name = `${node.name} Flatly export wrapper`
+    wrapper.name = `${node.name} — export helper`
     wrapper.fills = []
     wrapper.strokes = []
     wrapper.clipsContent = true
@@ -467,7 +470,7 @@ function placeNodeBeside(sourceNode: FlattenableNode, placedNode: FlattenableNod
 
 function createOriginalCopyBeside(node: FlattenableNode): FlattenableNode {
   const originalCopy = node.clone()
-  originalCopy.name = `${node.name} original`
+  originalCopy.name = `${node.name} — original`
   insertNodeAfter(node, originalCopy)
   placeNodeBeside(node, originalCopy)
 
@@ -639,7 +642,7 @@ async function resolveFailedNodes(failures: readonly FlattenFailure[]): Promise<
 }
 
 function getFailureSummary(failure: FlattenFailure): string {
-  return `${failure.nodeName} — ${FAILURE_OPERATION_MESSAGES[failure.operation]}.`
+  return `"${failure.nodeName}": ${FAILURE_OPERATION_MESSAGES[failure.operation]}.`
 }
 
 function getBatchMessage(
@@ -652,25 +655,27 @@ function getBatchMessage(
     return getFlattenedMessage(flattenedNodeCount)
   }
 
-  const nodeLabel = totalNodeCount === 1 ? 'node' : 'nodes'
   const maxDisplayedFailures = 8
   const displayedFailures = failures.slice(0, maxDisplayedFailures).map((failure) => `- ${getFailureSummary(failure)}`)
 
   if (failures.length > maxDisplayedFailures) {
-    displayedFailures.push(`- ${failures.length - maxDisplayedFailures} more nodes failed.`)
+    const remainingFailureCount = failures.length - maxDisplayedFailures
+    displayedFailures.push(
+      `- ${remainingFailureCount} more ${getLayerLabel(remainingFailureCount)} couldn't be flattened.`,
+    )
   }
 
   const selectionMessage =
     selectedFailedNodeCount === 0
-      ? 'Failed layers could not be selected.'
+      ? 'Couldn\'t select the layers that failed. Check them manually.'
       : selectedFailedNodeCount === 1
-        ? 'The failed layer is selected.'
-        : 'Failed layers are selected.'
+        ? 'The layer that couldn\'t be flattened is selected.'
+        : 'The layers that couldn\'t be flattened are selected.'
 
   return [
-    `Flattened ${flattenedNodeCount} of ${totalNodeCount} ${nodeLabel}.`,
+    `Flattened ${flattenedNodeCount} of ${totalNodeCount} ${getLayerLabel(totalNodeCount)}.`,
     '',
-    'Failed:',
+    'Couldn\'t flatten:',
     ...displayedFailures,
     '',
     selectionMessage,
@@ -687,7 +692,7 @@ async function run(): Promise<void> {
   const settings = await loadSettings()
   const progressNotification =
     nodes.length > 1
-      ? figma.notify(`Flattening ${nodes.length} layers...`, {
+      ? figma.notify(`Flattening ${nodes.length} layers…`, {
           timeout: Infinity,
         })
       : null
@@ -736,7 +741,7 @@ async function run(): Promise<void> {
             })
             progressNotification?.cancel()
             closeWithMessage(
-              `Could not restore "${failure.nodeName}" after the flattening error. Flattening stopped. Check the document and use Undo.`,
+              `Couldn't restore "${failure.nodeName}" after the error. Flattening stopped. Check the document, then use Undo if needed.`,
             )
             return
           }
@@ -761,7 +766,7 @@ async function run(): Promise<void> {
       return
     }
 
-    closeWithMessage('Could not flatten the selected nodes. Check that every selected frame, component, or instance can be exported.')
+    closeWithMessage('Couldn\'t flatten the selection. Make sure every selected frame, component, or instance can be exported.')
   }
 }
 
@@ -770,14 +775,14 @@ async function saveNativeSettings(parameters: ParameterValues | undefined): Prom
   const choice = parseNativeSettingsChoice(parameters?.[SETTINGS_PARAMETER_KEY])
 
   if (choice === null) {
-    closeWithMessage('Settings unchanged.')
+    closeWithMessage('No settings changed.')
     return
   }
 
   const selectedOption = NATIVE_SETTINGS_OPTIONS.find((option) => option.data === choice)
 
   if (!selectedOption) {
-    closeWithMessage('Settings unchanged.')
+    closeWithMessage('No settings changed.')
     return
   }
 
@@ -789,7 +794,7 @@ async function saveNativeSettings(parameters: ParameterValues | undefined): Prom
     })
     closeWithMessage('Settings saved.')
   } catch (_error) {
-    closeWithMessage('Could not save settings.')
+    closeWithMessage('Couldn\'t save settings. Try again.')
   }
 }
 
@@ -800,7 +805,7 @@ async function main(command: string, parameters: ParameterValues | undefined): P
   }
 
   if (command !== FLATTEN_COMMAND) {
-    closeWithMessage('Unknown Flatly command.')
+    closeWithMessage("Flatly couldn't start this action. Run the plugin again.")
     return
   }
 
@@ -816,7 +821,7 @@ figma.parameters.on('input', async ({ key, query, result }) => {
   const suggestions = getNativeSettingsSuggestions(getNativeSettingsChoice(settings), query)
 
   if (suggestions.length === 0) {
-    result.setError('Choose a valid original-layer setting.')
+    result.setError('Choose an original-layer option.')
     return
   }
 
