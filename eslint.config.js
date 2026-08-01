@@ -29,4 +29,22 @@ module.exports = tseslint.config(
   {
     ignores: ['code.js', 'dist', 'eslint.config.js'],
   },
+  {
+    files: ['scripts/**/*.cjs', 'tests/**/*.cjs'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: {
+        __dirname: 'readonly',
+        Buffer: 'readonly',
+        clearTimeout: 'readonly',
+        console: 'readonly',
+        require: 'readonly',
+        setImmediate: 'readonly',
+        setTimeout: 'readonly',
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
 )

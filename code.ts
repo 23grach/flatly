@@ -57,6 +57,11 @@ type SettledResult<T> =
       reason: unknown
     }
 
+type ExportAttempt = {
+  node: FlattenableNode
+  result: SettledResult<FlattenedExport>
+}
+
 const FAILURE_OPERATION_MESSAGES: Record<FlattenFailureOperation, string> = {
   export: 'Couldn\'t export it as a PNG. Check that it can be exported, then try again',
   'read-bounds': 'Couldn\'t read its size. Try again',
@@ -78,7 +83,6 @@ const DEFAULT_SETTINGS: FlatlySettings = {
 }
 
 class FlattenFailure extends Error {
-  readonly sourceNode: FlattenableNode
   readonly nodeId: string
   readonly nodeName: string
   readonly nodeType: FlattenableNode['type']
@@ -89,7 +93,6 @@ class FlattenFailure extends Error {
   constructor(node: FlattenableNode, phase: FlattenFailurePhase, operation: FlattenFailureOperation, cause: unknown) {
     super(`"${node.name}": ${FAILURE_OPERATION_MESSAGES[operation]}.`)
     this.name = 'FlattenFailure'
-    this.sourceNode = node
     this.nodeId = node.id
     this.nodeName = node.name
     this.nodeType = node.type
@@ -128,6 +131,15 @@ function settlePromise<T>(promise: Promise<T>): Promise<SettledResult<T>> {
   return promise.then(
     (value) => ({ status: 'fulfilled', value }),
     (reason) => ({ status: 'rejected', reason }),
+  )
+}
+
+async function exportSelection(nodes: readonly FlattenableNode[]): Promise<ExportAttempt[]> {
+  return Promise.all(
+    nodes.map(async (node) => ({
+      node,
+      result: await settlePromise(exportNodeWithContext(node)),
+    })),
   )
 }
 
@@ -490,10 +502,11 @@ function preserveSourceLayersInGroup(container: SourceContainerNode): void {
     return
   }
 
-  const existingWrapper = children[0]
+  const [existingWrapper] = children
 
   if (
     children.length === 1 &&
+    existingWrapper !== undefined &&
     existingWrapper.type === 'GROUP' &&
     existingWrapper.name === DEFAULT_GROUP_NAME &&
     !existingWrapper.visible
@@ -616,31 +629,6 @@ function applyFlattenedExportWithContext(exportedFrame: FlattenedExport, setting
   }
 }
 
-function isSceneNode(node: BaseNode | null): node is SceneNode {
-  return node !== null && node.type !== 'DOCUMENT' && node.type !== 'PAGE'
-}
-
-async function resolveFailedNodes(failures: readonly FlattenFailure[]): Promise<SceneNode[]> {
-  const selectedNodes: SceneNode[] = []
-  const selectedNodeIds = new Set<string>()
-
-  for (const failure of failures) {
-    const resolvedNode = await figma.getNodeByIdAsync(failure.nodeId)
-    const node = isSceneNode(resolvedNode)
-      ? resolvedNode
-      : failure.sourceNode.removed
-        ? null
-        : failure.sourceNode
-
-    if (node !== null && !selectedNodeIds.has(node.id)) {
-      selectedNodeIds.add(node.id)
-      selectedNodes.push(node)
-    }
-  }
-
-  return selectedNodes
-}
-
 function getFailureSummary(failure: FlattenFailure): string {
   return `"${failure.nodeName}": ${FAILURE_OPERATION_MESSAGES[failure.operation]}.`
 }
@@ -649,7 +637,6 @@ function getBatchMessage(
   totalNodeCount: number,
   flattenedNodeCount: number,
   failures: readonly FlattenFailure[],
-  selectedFailedNodeCount: number,
 ): string {
   if (failures.length === 0) {
     return getFlattenedMessage(flattenedNodeCount)
@@ -665,20 +652,11 @@ function getBatchMessage(
     )
   }
 
-  const selectionMessage =
-    selectedFailedNodeCount === 0
-      ? 'Couldn\'t select the layers that failed. Check them manually.'
-      : selectedFailedNodeCount === 1
-        ? 'The layer that couldn\'t be flattened is selected.'
-        : 'The layers that couldn\'t be flattened are selected.'
-
   return [
     `Flattened ${flattenedNodeCount} of ${totalNodeCount} ${getLayerLabel(totalNodeCount)}.`,
     '',
     'Couldn\'t flatten:',
     ...displayedFailures,
-    '',
-    selectionMessage,
   ].join('\n')
 }
 
@@ -698,18 +676,18 @@ async function run(): Promise<void> {
       : null
 
   try {
-    const exportResults = await Promise.all(nodes.map((node) => settlePromise(exportNodeWithContext(node))))
+    const exportAttempts = await exportSelection(nodes)
     const exportedFrames: FlattenedExport[] = []
-    const flattenedNodes: SceneNode[] = []
+    let flattenedNodeCount = 0
     const failures: FlattenFailure[] = []
 
-    for (const [index, result] of exportResults.entries()) {
+    for (const { node, result } of exportAttempts) {
       if (result.status === 'fulfilled') {
         exportedFrames.push(result.value)
         continue
       }
 
-      const failure = asFlattenFailure(result.reason, nodes[index], 'export', 'export')
+      const failure = asFlattenFailure(result.reason, node, 'export', 'export')
       failures.push(failure)
       logFlattenFailure(failure)
     }
@@ -721,11 +699,11 @@ async function run(): Promise<void> {
         figma.commitUndo()
         mutationBoundaryOpen = true
 
-        const flattenedNode = applyFlattenedExportWithContext(exportedFrame, settings)
+        applyFlattenedExportWithContext(exportedFrame, settings)
 
         figma.commitUndo()
         mutationBoundaryOpen = false
-        flattenedNodes.push(flattenedNode)
+        flattenedNodeCount += 1
       } catch (error) {
         const failure = asFlattenFailure(error, exportedFrame.node, 'flatten', 'flatten')
 
@@ -752,11 +730,8 @@ async function run(): Promise<void> {
       }
     }
 
-    const failedNodes = failures.length > 0 ? await resolveFailedNodes(failures) : []
-    figma.currentPage.selection = failedNodes.length > 0 ? failedNodes : flattenedNodes
-
     progressNotification?.cancel()
-    closeWithMessage(getBatchMessage(nodes.length, flattenedNodes.length, failures, failedNodes.length))
+    closeWithMessage(getBatchMessage(nodes.length, flattenedNodeCount, failures))
   } catch (error) {
     progressNotification?.cancel()
 
@@ -829,5 +804,8 @@ figma.parameters.on('input', async ({ key, query, result }) => {
 })
 
 figma.on('run', ({ command, parameters }) => {
-  void main(command, parameters)
+  void main(command, parameters).catch((error: unknown) => {
+    console.error('[Flatly] The plugin stopped unexpectedly.', { cause: error })
+    closeWithMessage("Flatly couldn't finish this action. Try again.")
+  })
 })

@@ -2,7 +2,7 @@
 
 Flatly is a Figma plugin that rasterizes selected frames, main components, and instances.
 
-When Flatly runs, it exports every selected node as a PNG at maximum resolution. The largest image dimension is 4096px. Frames and main components are flattened into a single image fill. Instances either keep the current linked instance and create a detached flattened frame nearby, or flatten the selected instance in place, depending on your source-layer settings. After flattening, Figma selects the flattened results and zooms to them.
+When Flatly runs, it exports every selected node as a PNG up to Figma's 4096px image limit and a 32x upscale limit. Frames and main components are flattened into a single image fill. Instances either keep the current linked instance and create a detached flattened frame nearby, or flatten the selected instance in place, depending on your source-layer settings.
 
 ## Setup
 
@@ -29,9 +29,9 @@ When Flatly runs, it exports every selected node as a PNG at maximum resolution.
 
 Use `Plugins > Development > Flatly > Settings` to configure what happens to the original editable layers before flattening. Choose one of the three native options:
 
-- `Keep original layers / Inside`;
-- `Keep original layers / Beside`;
-- `Remove original layers`.
+- `Keep original layers inside the result`
+- `Keep original layers beside the result`
+- `Remove original layers`
 
 Settings are saved when you finish the native Figma parameter flow. Removing original layers no longer asks for a placement.
 
@@ -75,4 +75,10 @@ Run lint checks:
 
 ```sh
 npm run lint
+```
+
+Run the full release check before importing or publishing the plugin:
+
+```sh
+npm run verify
 ```

@@ -2,6 +2,9 @@
   "compilerOptions": {
     "target": "es2019",
     "lib": ["es2019"],
+    "forceConsistentCasingInFileNames": true,
+    "noEmitOnError": true,
+    "noUncheckedIndexedAccess": true,
     "strict": true,
     "typeRoots": [
       "./node_modules/@types",
