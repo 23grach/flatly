@@ -2,7 +2,9 @@ const RESULT_GAP = 24
 const SETTINGS_STORAGE_KEY = 'flatly.settings.v1'
 const DEFAULT_GROUP_NAME = 'Flatly source layers'
 const FIGMA_IMAGE_MAX_DIMENSION = 4096
-const MAX_AUTO_UPSCALE = 32
+const MAX_AUTO_UPSCALE = 24
+const MAX_AUTO_PIXEL_COUNT = 4_000_000
+const TRANSFORM_EPSILON = 0.0001
 const FLATTEN_COMMAND = 'flatten'
 const SETTINGS_COMMAND = 'settings'
 const SETTINGS_PARAMETER_KEY = 'settings'
@@ -134,13 +136,22 @@ function settlePromise<T>(promise: Promise<T>): Promise<SettledResult<T>> {
   )
 }
 
+function yieldToFigma(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0))
+}
+
 async function exportSelection(nodes: readonly FlattenableNode[]): Promise<ExportAttempt[]> {
-  return Promise.all(
-    nodes.map(async (node) => ({
+  const attempts: ExportAttempt[] = []
+
+  for (const node of nodes) {
+    attempts.push({
       node,
       result: await settlePromise(exportNodeWithContext(node)),
-    })),
-  )
+    })
+    await yieldToFigma()
+  }
+
+  return attempts
 }
 
 function logFlattenFailure(failure: FlattenFailure): void {
@@ -349,7 +360,11 @@ function getMaximumFlattenScale(bounds: Bounds): number {
     return 1
   }
 
-  return Math.min(FIGMA_IMAGE_MAX_DIMENSION / maxDimension, MAX_AUTO_UPSCALE)
+  const pixelArea = bounds.width * bounds.height
+  const pixelBudgetScale =
+    Number.isFinite(pixelArea) && pixelArea > 0 ? Math.sqrt(MAX_AUTO_PIXEL_COUNT / pixelArea) : MAX_AUTO_UPSCALE
+
+  return Math.min(FIGMA_IMAGE_MAX_DIMENSION / maxDimension, MAX_AUTO_UPSCALE, pixelBudgetScale)
 }
 
 function getLayerLabel(layerCount: number): 'layer' | 'layers' {
@@ -379,6 +394,15 @@ function neutralizeExportClone(node: FlattenableNode): void {
   node.opacity = 1
   node.strokes = []
   node.effects = []
+}
+
+function isPositiveAxisAlignedTransform(transform: Transform): boolean {
+  return (
+    Math.abs(transform[0][1]) <= TRANSFORM_EPSILON &&
+    Math.abs(transform[1][0]) <= TRANSFORM_EPSILON &&
+    transform[0][0] > TRANSFORM_EPSILON &&
+    transform[1][1] > TRANSFORM_EPSILON
+  )
 }
 
 function translateNode(node: FlattenableNode | SourceContainerNode, dx: number, dy: number): void {
@@ -416,14 +440,29 @@ function createExportWrapper(node: FlattenableNode, bounds: Bounds, transform: T
   return wrapper
 }
 
+function createDirectExportClone(node: FlattenableNode): FlattenableNode {
+  let exportClone: FlattenableNode | null = null
+
+  try {
+    exportClone = node.clone()
+    neutralizeExportClone(exportClone)
+    return exportClone
+  } catch (error) {
+    exportClone?.remove()
+    throw error
+  }
+}
+
 async function exportNode(node: FlattenableNode): Promise<FlattenedExport> {
   const bounds = getTransformedBounds(node)
   const scale = getMaximumFlattenScale(bounds)
   const transform = node.relativeTransform
-  const exportWrapper = createExportWrapper(node, bounds, transform)
+  const exportTarget = isPositiveAxisAlignedTransform(transform)
+    ? createDirectExportClone(node)
+    : createExportWrapper(node, bounds, transform)
 
   try {
-    const bytes = await exportWrapper.exportAsync({
+    const bytes = await exportTarget.exportAsync({
       format: 'PNG',
       useAbsoluteBounds: true,
       constraint: {
@@ -439,7 +478,7 @@ async function exportNode(node: FlattenableNode): Promise<FlattenedExport> {
       bounds,
     }
   } finally {
-    exportWrapper.remove()
+    exportTarget.remove()
   }
 }
 
@@ -581,7 +620,6 @@ function createFlattenedFrameNextToInstance(exportedFrame: FlattenedExport, sett
   const instanceCopy = withFailureContext(node, 'create-detached-frame', () => node.clone())
   withFailureContext(node, 'place-result', () => {
     insertNodeAfter(node, instanceCopy)
-    placeNodeBeside(node, instanceCopy)
   })
 
   const resultFrame = withFailureContext(node, 'detach-instance', () => instanceCopy.detachInstance())
@@ -671,7 +709,7 @@ async function run(): Promise<void> {
   }
 
   const settings = await loadSettings()
-  const progressNotification =
+  let progressNotification =
     nodes.length > 1
       ? figma.notify(`Flattening ${nodes.length} layers…`, {
           timeout: Infinity,
@@ -695,16 +733,24 @@ async function run(): Promise<void> {
       logFlattenFailure(failure)
     }
 
+    progressNotification?.cancel()
+    progressNotification =
+      exportedFrames.length > 1
+        ? figma.notify(`Applying ${exportedFrames.length} flattened layers…`, {
+            timeout: Infinity,
+          })
+        : null
+
     for (const exportedFrame of exportedFrames) {
       let mutationBoundaryOpen = false
 
       try {
+        // Commit the previous node's pending changes so a failure only undoes this node.
         figma.commitUndo()
         mutationBoundaryOpen = true
 
         applyFlattenedExportWithContext(exportedFrame, settings)
 
-        figma.commitUndo()
         mutationBoundaryOpen = false
         flattenedNodeCount += 1
       } catch (error) {
@@ -731,6 +777,8 @@ async function run(): Promise<void> {
         failures.push(failure)
         logFlattenFailure(failure)
       }
+
+      await yieldToFigma()
     }
 
     progressNotification?.cancel()

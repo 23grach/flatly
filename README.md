@@ -41,7 +41,7 @@ Copies kept beside the result use the original name followed by ` — original` 
 
 ## Automatic resolution
 
-Flatly calculates the largest export scale that keeps the longest transformed dimension at or below 4096px. Smaller layers can be upscaled automatically, up to 32x. The other dimension keeps its aspect ratio.
+Flatly calculates the largest export scale that keeps the longest transformed dimension at or below 4096px. Smaller layers can be upscaled automatically, up to 24x. A 4-million-pixel budget can lower the scale for larger layers. The other dimension keeps its aspect ratio.
 
 There is no resolution picker or saved scale setting. Flatly also bakes the source transform into the image, so rotated and mirrored layers keep their visual appearance in the flattened result.
 

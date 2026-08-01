@@ -13,12 +13,16 @@ function toPlain(value) {
 
 function createMockRuntime(options = {}) {
   const state = {
+    activeExports: 0,
     closeMessages: [],
     commits: 0,
     exports: [],
+    exportNodes: [],
+    frameCreations: 0,
     imageCount: 0,
     inputHandler: null,
     logs: [],
+    maxConcurrentExports: 0,
     notificationCancels: 0,
     notifications: [],
     runHandler: null,
@@ -123,15 +127,24 @@ function createMockRuntime(options = {}) {
       },
       async exportAsync(settings) {
         state.exports.push(settings)
+        state.exportNodes.push(node.name)
+        state.activeExports += 1
+        state.maxConcurrentExports = Math.max(state.maxConcurrentExports, state.activeExports)
 
-        const exportError =
-          typeof options.exportError === 'function' ? options.exportError(node, settings) : options.exportError
+        try {
+          await Promise.resolve()
 
-        if (exportError) {
-          throw exportError
+          const exportError =
+            typeof options.exportError === 'function' ? options.exportError(node, settings) : options.exportError
+
+          if (exportError) {
+            throw exportError
+          }
+
+          return new Uint8Array([1, 2, 3])
+        } finally {
+          state.activeExports -= 1
         }
-
-        return new Uint8Array([1, 2, 3])
       },
       remove() {
         detachNode(node)
@@ -204,6 +217,7 @@ function createMockRuntime(options = {}) {
       }
     },
     createFrame() {
+      state.frameCreations += 1
       return createContainer('FRAME')
     },
     createImage() {
@@ -211,8 +225,11 @@ function createMockRuntime(options = {}) {
       return { hash: `image-${state.imageCount}` }
     },
     group(children, parent, index) {
-      if (options.groupError) {
-        throw options.groupError
+      const groupError =
+        typeof options.groupError === 'function' ? options.groupError(parent) : options.groupError
+
+      if (groupError) {
+        throw groupError
       }
 
       const group = createContainer('GROUP', { name: 'Group', width: 1, height: 1 })
@@ -276,7 +293,7 @@ async function waitForClose(state) {
       return
     }
 
-    await new Promise((resolve) => setImmediate(resolve))
+    await new Promise((resolve) => setTimeout(resolve, 0))
   }
 
   assert.fail('The plugin did not close')
@@ -341,10 +358,43 @@ test('computes transformed bounds and safe export scales', () => {
     width: 50,
     height: 100,
   })
-  assert.equal(runtime.helpers.getMaximumFlattenScale({ width: 100, height: 50 }), 32)
+  assert.equal(runtime.helpers.getMaximumFlattenScale({ width: 100, height: 50 }), 24)
   assert.equal(runtime.helpers.getMaximumFlattenScale({ width: 1024, height: 100 }), 4)
   assert.equal(runtime.helpers.getMaximumFlattenScale({ width: 8192, height: 100 }), 0.5)
+  assert.equal(runtime.helpers.getMaximumFlattenScale({ width: 1000, height: 1000 }), 2)
   assert.equal(runtime.helpers.getMaximumFlattenScale({ width: 0, height: 0 }), 1)
+})
+
+test('uses a direct clone for axis-aligned layers and keeps the wrapper for rotated layers', async () => {
+  const directRuntime = createMockRuntime()
+  const directFrame = directRuntime.makeContainer('FRAME', {
+    name: 'Axis-aligned card',
+    children: [directRuntime.makeLeaf()],
+  })
+
+  directRuntime.figma.currentPage.appendChild(directFrame)
+  directRuntime.figma.currentPage.selection = [directFrame]
+  directRuntime.state.runHandler({ command: 'flatten', parameters: undefined })
+  await waitForClose(directRuntime.state)
+
+  assert.equal(directRuntime.state.frameCreations, 0)
+
+  const rotatedRuntime = createMockRuntime()
+  const rotatedFrame = rotatedRuntime.makeContainer('FRAME', {
+    name: 'Rotated card',
+    relativeTransform: [
+      [0, -1, 100],
+      [1, 0, 20],
+    ],
+    children: [rotatedRuntime.makeLeaf()],
+  })
+
+  rotatedRuntime.figma.currentPage.appendChild(rotatedFrame)
+  rotatedRuntime.figma.currentPage.selection = [rotatedFrame]
+  rotatedRuntime.state.runHandler({ command: 'flatten', parameters: undefined })
+  await waitForClose(rotatedRuntime.state)
+
+  assert.equal(rotatedRuntime.state.frameCreations, 1)
 })
 
 test('runs a frame flatten and preserves sources without changing selection', async () => {
@@ -365,15 +415,43 @@ test('runs a frame flatten and preserves sources without changing selection', as
 
   assert.deepEqual(runtime.state.closeMessages, ['Flattened 1 layer.'])
   assert.equal(runtime.state.exports.length, 1)
-  assert.equal(runtime.state.exports[0].constraint.value, 32)
+  assert.equal(runtime.state.exports[0].constraint.value, 24)
+  assert.equal(runtime.state.maxConcurrentExports, 1)
   assert.equal(runtime.figma.currentPage.selection.length, 1)
   assert.equal(runtime.figma.currentPage.selection[0], frame)
   assert.equal(frame.fills[0].imageHash, 'image-1')
   assert.equal(frame.children.length, 1)
   assert.equal(frame.children[0].name, 'Flatly source layers')
   assert.equal(frame.children[0].visible, false)
-  assert.equal(runtime.state.commits, 2)
+  assert.equal(runtime.state.commits, 1)
   assert.equal(runtime.figma.currentPage.children.length, 1)
+})
+
+test('serializes batch exports and shows the apply phase', async () => {
+  const runtime = createMockRuntime()
+  const firstFrame = runtime.makeContainer('FRAME', {
+    name: 'First card',
+    children: [runtime.makeLeaf()],
+  })
+  const secondFrame = runtime.makeContainer('FRAME', {
+    name: 'Second card',
+    children: [runtime.makeLeaf()],
+  })
+
+  runtime.figma.currentPage.appendChild(firstFrame)
+  runtime.figma.currentPage.appendChild(secondFrame)
+  runtime.figma.currentPage.selection = [firstFrame, secondFrame]
+  runtime.state.runHandler({ command: 'flatten', parameters: undefined })
+  await waitForClose(runtime.state)
+
+  assert.equal(runtime.state.maxConcurrentExports, 1)
+  assert.deepEqual(runtime.state.exportNodes, ['First card', 'Second card'])
+  assert.deepEqual(
+    runtime.state.notifications.map(({ message }) => message),
+    ['Flattening 2 layers…', 'Applying 2 flattened layers…'],
+  )
+  assert.equal(runtime.state.notificationCancels, 2)
+  assert.equal(runtime.state.commits, 2)
 })
 
 test('reuses an existing source-layer group instead of nesting it', async () => {
@@ -539,6 +617,34 @@ test('finishes a mixed batch without changing selection', async () => {
   assert.equal(runtime.figma.currentPage.selection[1], badFrame)
   assert.equal(runtime.state.notifications.length, 1)
   assert.equal(runtime.state.notificationCancels, 1)
+})
+
+test('commits completed layers before rolling back a later failed layer', async () => {
+  const runtime = createMockRuntime({
+    groupError(parent) {
+      return parent.name === 'Bad card' ? new Error('group failed') : null
+    },
+  })
+  const goodFrame = runtime.makeContainer('FRAME', {
+    name: 'Good card',
+    children: [runtime.makeLeaf()],
+  })
+  const badFrame = runtime.makeContainer('FRAME', {
+    name: 'Bad card',
+    children: [runtime.makeLeaf()],
+  })
+
+  runtime.figma.currentPage.appendChild(goodFrame)
+  runtime.figma.currentPage.appendChild(badFrame)
+  runtime.figma.currentPage.selection = [goodFrame, badFrame]
+  runtime.state.runHandler({ command: 'flatten', parameters: undefined })
+  await waitForClose(runtime.state)
+
+  assert.equal(runtime.state.commits, 2)
+  assert.equal(runtime.state.undos, 1)
+  assert.equal(goodFrame.fills[0].imageHash, 'image-1')
+  assert.equal(badFrame.fills.length, 0)
+  assert.equal(badFrame.children.length, 1)
 })
 
 test('loads parameter suggestions and saves the selected settings', async () => {
